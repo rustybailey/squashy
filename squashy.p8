@@ -2,93 +2,177 @@ pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
 
-score=0
+-- todo: move obj methods onto the object and implement an update/draw method on each obj
+-- todo: make the paddle have a "bump" animation against the side and have a "bump" sound effect
+-- todo: implement bounding_box_collision
+
 lives=3
+gameover=false
 sfx(4,1)
 
--- paddle
-padx=52
-pady=122
-padw=24
-padh=4
+score={
+  value=0,
+  increment_value=1,
+  increment=function(self)
+    self.value+=self.increment_value
+  end,
+  reset=function(self)
+    self.value=0
+  end
+}
 
--- ball
-ballx=64
-bally=64
-ballsize=3
-ballxdir=5
-ballydir=-3
+paddle={
+  x=52,
+  y=122,
+  w=24,
+  h=4,
+  visible=true,
+  reset=function(self)
+    self.x=52
+    self.y=122
+    self.visible=true
+  end,
+  hide=function(self)
+    self.visible=false
+  end
+}
+
+ball = {
+  x=64,
+  y=64,
+  size=3,
+  xdir=5,
+  ydir=-3,
+  visible=true,
+  reset=function(self)
+    self.x=64
+    self.y=64
+    self.xdir=5
+    self.ydir=-3
+    self.visible=true
+  end,
+  hide=function(self)
+    self.y=64
+    self.x=64
+    self.ydir=0
+    self.xdir=0
+    self.visible=false
+  end
+}
+
+high_score={
+  value=0,
+  get=function(self)
+    -- value=dget(1)
+    internal_value=dget(1)
+    return internal_value
+  end,
+  set=function(self,score)
+    if (self:is_new_high_score(score)) then
+      dset(1,score)
+      self.value = score
+    end
+  end,
+  is_new_high_score=function(self,score)
+    return score > self.get()
+  end
+}
 
 function movepaddle()
 	if btn(0) then
-		padx-=6
-    if (padx < 0) then
-      padx = 0
+		paddle.x-=6
+    if (paddle.x < 0) then
+      paddle.x = 0
     end
 	elseif btn(1) then
-		padx+=6
-    if (padx+padw > 127) then
-      padx = 127-padw
+		paddle.x+=6
+    if (paddle.x+paddle.w > 127) then
+      paddle.x = 127-paddle.w
     end
 	end
 end
 
 function moveball()
-  ballx+=ballxdir
-  bally+=ballydir
+  ball.x+=ball.xdir
+  ball.y+=ball.ydir
 end
 
 function losedeadball()
-	if bally>128-ballsize then
+	if ball.y>128-ball.size then
 		if lives>0 then
 			--next life
 			sfx(2)
-			bally=24
+			ball.y=24
 			lives-=1
 		else
 			--game over
-			sfx(-1,1)
-			sfx(3)
-			ballydir=0
-			ballxdir=0
-			bally=64
+      handle_gameover()
 		end
 	end
 end
 
+function handle_gameover()
+  -- this shows the gameover text
+  gameover=true
+  -- stop music
+  sfx(-1,1)
+  -- play death sfx
+  sfx(3)
+  -- hide ball/paddle
+  ball:hide()
+  paddle:hide()
+  -- set high score
+  high_score:set(score.value)
+end
+
 function bounceball()
   --left
-  if ballx < ballsize then
-    ballxdir=-ballxdir
+  if ball.x < ball.size then
+    ball.xdir=-ball.xdir
     sfx(0)
   end
 
   --right
-  if ballx > 128-ballsize then
-    ballxdir=-ballxdir
+  if ball.x > 128-ball.size then
+    ball.xdir=-ball.xdir
     sfx(0)
   end
 
   --top
-  if bally < ballsize then
-    ballydir=-ballydir
+  if ball.y < ball.size then
+    ball.ydir=-ball.ydir
     sfx(0)
   end
 end
 
 -- bounce the ball off the paddle
 function bouncepaddle()
-  if ballx>=padx and ballx<=padx+padw and bally>pady then
+  if ball.x>=paddle.x and ball.x<=paddle.x+paddle.w and ball.y>paddle.y then
     sfx(1)
-    score+=10
-    ballydir=-ballydir
+    score:increment()
+    ball.ydir=-ball.ydir
   end
 end
 
--- todo: create method for showing game over state and reset method
--- todo: save and show high score with dset, dget
--- todo: make the paddle have a "bump" animation against the side and have a "bump" sound effect
--- todo: implement bounding_box_collision
+function listen_for_reset()
+  if btn(4) then
+    reset_game()
+  end
+end
+
+function reset_game()
+  score:reset()
+  paddle:reset()
+  ball:reset()
+  lives=3
+  gameover=false
+  sfx(4,1)
+end
+
+function _init()
+  cartdata("squashy_values")
+  high_score.value = high_score:get()
+end
 
 function _update()
 	movepaddle()
@@ -96,6 +180,9 @@ function _update()
 	bouncepaddle()
 	moveball()
 	losedeadball()
+  if (gameover == true) then
+    listen_for_reset()
+  end
 end
 
 function _draw()
@@ -104,17 +191,28 @@ function _draw()
 
 	-- draw the lives
 	for i=1, lives do
-		spr(001,90+i*8,4)
+		spr(001,90+i*8,5)
 	end
 
 	-- draw the score
-	print(score,12,6,15)
+  print("hi : " .. high_score.value,6,6,15)
+  print("you: " .. score.value,6,12,15)
+
+  if (gameover == true) then
+    -- x_pos=middle_of_screen-(number_of_characters/2)*pixels_per_character
+    print("game over", 64-(9/2)*4, 61, 15)
+    print("press \x8e to retry", 64-(17/2)*4, 67, 15)
+  end
 
   -- draw the paddle
-  rectfill(padx,pady,padx+padw,pady+padw,15)
+  if paddle.visible == true then
+    rectfill(paddle.x,paddle.y,paddle.x+paddle.w,paddle.y+paddle.w,15)
+  end
 
   -- draw the ball
-  circfill(ballx,bally,ballsize,15)
+  if ball.visible == true then
+    circfill(ball.x,ball.y,ball.size,15)
+  end
 end
 
 
