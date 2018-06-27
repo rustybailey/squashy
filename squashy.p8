@@ -34,6 +34,19 @@ paddle={
   end,
   hide=function(self)
     self.visible=false
+  end,
+  move=function(self)
+    if btn(0) then
+      self.x-=6
+      if (self.x < 0) then
+        self.x = 0
+      end
+    elseif btn(1) then
+      self.x+=6
+      if (self.x+self.w > 127) then
+        self.x = 127-self.w
+      end
+    end
   end
 }
 
@@ -44,6 +57,12 @@ ball = {
   xdir=5,
   ydir=-3,
   visible=true,
+  update=function(self)
+    self:bounce_off_wall()
+    self:bounce_off_paddle()
+    self:move()
+    self:handle_lost()
+  end,
   reset=function(self)
     self.x=64
     self.y=64
@@ -57,6 +76,54 @@ ball = {
     self.ydir=0
     self.xdir=0
     self.visible=false
+  end,
+  move=function(self)
+    self.x+=self.xdir
+    self.y+=self.ydir
+  end,
+  bounce_off_wall=function(self)
+    --left
+    if self.x < self.size then
+      self.xdir=-self.xdir
+      sfx(0)
+    end
+
+    --right
+    if self.x > 128-self.size then
+      self.xdir=-self.xdir
+      sfx(0)
+    end
+
+    --top
+    if self.y < self.size then
+      self.ydir=-self.ydir
+      sfx(0)
+    end
+  end,
+  bounce_off_paddle=function(self)
+    if self.x >= paddle.x and
+      self.x <= paddle.x + paddle.w and
+      self.y > paddle.y then
+      sfx(1)
+      score:increment()
+      self.ydir=-self.ydir
+    end
+  end,
+  is_lost=function(self)
+    return self.y > 128-self.size
+  end,
+  handle_lost=function(self)
+    if self:is_lost() then
+      if lives>0 then
+        --next life
+        sfx(2)
+        self.y=24
+        lives-=1
+      else
+        --game over
+        handle_gameover()
+      end
+    end
   end
 }
 
@@ -78,39 +145,6 @@ high_score={
   end
 }
 
-function movepaddle()
-	if btn(0) then
-		paddle.x-=6
-    if (paddle.x < 0) then
-      paddle.x = 0
-    end
-	elseif btn(1) then
-		paddle.x+=6
-    if (paddle.x+paddle.w > 127) then
-      paddle.x = 127-paddle.w
-    end
-	end
-end
-
-function moveball()
-  ball.x+=ball.xdir
-  ball.y+=ball.ydir
-end
-
-function losedeadball()
-	if ball.y>128-ball.size then
-		if lives>0 then
-			--next life
-			sfx(2)
-			ball.y=24
-			lives-=1
-		else
-			--game over
-      handle_gameover()
-		end
-	end
-end
-
 function handle_gameover()
   -- this shows the gameover text
   gameover=true
@@ -123,35 +157,6 @@ function handle_gameover()
   paddle:hide()
   -- set high score
   high_score:set(score.value)
-end
-
-function bounceball()
-  --left
-  if ball.x < ball.size then
-    ball.xdir=-ball.xdir
-    sfx(0)
-  end
-
-  --right
-  if ball.x > 128-ball.size then
-    ball.xdir=-ball.xdir
-    sfx(0)
-  end
-
-  --top
-  if ball.y < ball.size then
-    ball.ydir=-ball.ydir
-    sfx(0)
-  end
-end
-
--- bounce the ball off the paddle
-function bouncepaddle()
-  if ball.x>=paddle.x and ball.x<=paddle.x+paddle.w and ball.y>paddle.y then
-    sfx(1)
-    score:increment()
-    ball.ydir=-ball.ydir
-  end
 end
 
 function listen_for_reset()
@@ -175,11 +180,8 @@ function _init()
 end
 
 function _update()
-	movepaddle()
-	bounceball()
-	bouncepaddle()
-	moveball()
-	losedeadball()
+	paddle:move()
+	ball:update()
   if (gameover == true) then
     listen_for_reset()
   end
