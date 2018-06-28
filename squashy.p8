@@ -21,33 +21,43 @@ score={
   end
 }
 
-paddle={
-  x=52,
-  y=122,
-  w=24,
-  h=4,
-  visible=true,
-  reset=function(self)
-    self.x=52
-    self.y=122
-    self.visible=true
-  end,
-  hide=function(self)
-    self.visible=false
-  end,
-  move=function(self)
-    if btn(0) then
-      self.x-=6
-      if (self.x < 0) then
-        self.x = 0
-      end
-    elseif btn(1) then
-      self.x+=6
-      if (self.x+self.w > 127) then
-        self.x = 127-self.w
+
+
+function make_paddle(player_num, color)
+  return {
+    x=52,
+    y=122,
+    w=24,
+    h=4,
+    visible=true,
+    color=color,
+    reset=function(self)
+      self.x=52
+      self.y=122
+      self.visible=true
+    end,
+    hide=function(self)
+      self.visible=false
+    end,
+    move=function(self)
+      if btn(0, player_num) then
+        self.x-=6
+        if (self.x < 0) then
+          self.x = 0
+        end
+      elseif btn(1, player_num) then
+        self.x+=6
+        if (self.x+self.w > 127) then
+          self.x = 127-self.w
+        end
       end
     end
-  end
+  }
+end
+
+paddles={
+  make_paddle(0, 15),
+  make_paddle(1, 2)
 }
 
 ball = {
@@ -101,12 +111,14 @@ ball = {
     end
   end,
   bounce_off_paddle=function(self)
-    if self.x >= paddle.x and
-      self.x <= paddle.x + paddle.w and
-      self.y > paddle.y then
-      sfx(1)
-      score:increment()
-      self.ydir=-self.ydir
+    for paddle in all(paddles) do
+      if self.x >= paddle.x and
+        self.x <= paddle.x + paddle.w and
+        self.y + self.size > paddle.y then
+        sfx(1)
+        score:increment()
+        self.ydir=-self.ydir
+      end
     end
   end,
   is_lost=function(self)
@@ -154,7 +166,9 @@ function handle_gameover()
   sfx(3)
   -- hide ball/paddle
   ball:hide()
-  paddle:hide()
+  for paddle in all(paddles) do
+    paddle:hide()
+  end
   -- set high score
   high_score:set(score.value)
 end
@@ -167,7 +181,9 @@ end
 
 function reset_game()
   score:reset()
-  paddle:reset()
+  for paddle in all(paddles) do
+    paddle:reset()
+  end
   ball:reset()
   lives=3
   gameover=false
@@ -180,7 +196,9 @@ function _init()
 end
 
 function _update()
-	paddle:move()
+  for paddle in all(paddles) do
+	  paddle:move()
+  end
 	ball:update()
   if (gameover == true) then
     listen_for_reset()
@@ -207,8 +225,10 @@ function _draw()
   end
 
   -- draw the paddle
-  if paddle.visible == true then
-    rectfill(paddle.x,paddle.y,paddle.x+paddle.w,paddle.y+paddle.w,15)
+  for paddle in all(paddles) do
+    if paddle.visible == true then
+      rectfill(paddle.x,paddle.y,paddle.x+paddle.w,paddle.y+paddle.w,paddle.color)
+    end
   end
 
   -- draw the ball
